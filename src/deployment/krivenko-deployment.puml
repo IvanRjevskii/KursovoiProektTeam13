@@ -1,0 +1,48 @@
+@startuml krivenko-deployment
+' ============================================================
+' Команда 13. Диаграмма развёртывания: развёртывание сервиса маршрутизации и файлового хранилища.
+' Автор: Кривенко И. Р. (DevOps).
+' Правила: только Rel() без направляющих суффиксов, без локальных стилей и цветов. ID — из README.md.
+' ============================================================
+!include <C4/C4_Deployment>
+
+LAYOUT_WITH_LEGEND()
+
+title Развёртывание сервиса маршрутизации и файлового хранилища
+
+Deployment_Node(phone, "Смартфон курьера", "Android / iOS") {
+    Container(courier_app, "Мобильное приложение курьера", "React Native")
+}
+Deployment_Node(dc, "ЦОД компании", "Частное облако (VPC)") {
+    Deployment_Node(dmz, "Сервер-шлюз (DMZ)", "Ubuntu 24.04 VM") {
+        Container(nginx, "Reverse Proxy", "Nginx", "TLS-терминация, балансировка, раздача SPA")
+    }
+    Deployment_Node(app, "Сервер приложений", "Ubuntu 24.04, Docker") {
+        Container(api_gateway, "Backend API", "Python / FastAPI, порт 8000")
+        Container(routing_service, "Сервис маршрутизации", "Python / asyncio, gRPC, порт 50051")
+    }
+    Deployment_Node(storage1, "Сервер хранения 1", "Ubuntu 24.04 VM") {
+        ContainerDb(file_storage_1, "MinIO, узел 1", "MinIO, порт 9000")
+    }
+    Deployment_Node(storage2, "Сервер хранения 2", "Ubuntu 24.04 VM") {
+        ContainerDb(file_storage_2, "MinIO, узел 2", "MinIO, порт 9000")
+    }
+    Deployment_Node(db_master, "Сервер БД (мастер)", "Ubuntu 24.04 VM") {
+        ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS")
+    }
+    Deployment_Node(db_replica, "Сервер БД (реплика)", "Ubuntu 24.04 VM") {
+        ContainerDb(database_replica, "Реплика БД", "PostgreSQL 16 + PostGIS", "Горячий резерв")
+    }
+}
+System_Ext(geo_service, "Картографический сервис", "Внешний API")
+
+Rel(courier_app, nginx, "Запросы к API и загрузка фото", "HTTPS / TLS 1.3, 443, интернет")
+Rel(nginx, api_gateway, "Проксирование запросов API", "HTTP, 8000, внутренняя сеть")
+Rel(api_gateway, routing_service, "Построение маршрута", "gRPC / mTLS, 50051")
+Rel(routing_service, database, "Пространственные запросы", "SQL/TCP, TLS, 5432")
+Rel(routing_service, geo_service, "Матрица расстояний", "HTTPS / TLS 1.3, 443, исходящий трафик")
+Rel(nginx, file_storage_1, "Загрузка фото, балансировка", "HTTPS (S3 API), 9000")
+Rel(nginx, file_storage_2, "Загрузка фото, балансировка", "HTTPS (S3 API), 9000")
+Rel(file_storage_1, file_storage_2, "Репликация объектов", "HTTPS, 9000")
+Rel(database, database_replica, "Потоковая репликация", "WAL/TCP, 5432, сеть репликации")
+@enduml
