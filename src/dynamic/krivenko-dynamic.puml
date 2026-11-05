@@ -1,0 +1,35 @@
+@startuml krivenko-dynamic
+' ============================================================
+' Команда 13. Динамическая диаграмма: «Построение маршрута волны». Нумерация стрелок — порядок вызовов.
+' Автор: Кривенко И. Р. (DevOps).
+' Правила: только Rel() без направляющих суффиксов, без локальных стилей и цветов. ID — из README.md.
+' ============================================================
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Динамическая диаграмма — Построение маршрута волны
+
+Container(api_gateway, "Backend API", "Python / FastAPI", "Компонент route_comp")
+Container_Boundary(routing_service, "Сервис маршрутизации (Python / asyncio)") {
+    Component(grpc_server, "gRPC-сервер", "grpcio", "Приём запросов")
+    Component(route_planner, "Планировщик маршрута", "Python-модуль", "Выбор алгоритма и построение порядка объезда")
+    Component(pvz_repository, "Репозиторий ПВЗ", "asyncpg", "Координаты ПВЗ")
+    Component(matrix_builder, "Построитель матрицы", "Python-модуль", "Матрица расстояний")
+    Component(distance_cache, "Кэш расстояний", "Python, словарь в памяти с TTL", "Рассчитанные расстояния")
+    Component(geo_client, "Клиент картографического сервиса", "httpx", "Внешние запросы")
+}
+ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "ПВЗ")
+System_Ext(geo_service, "Картографический сервис", "Матрица расстояний")
+
+Rel(api_gateway, grpc_server, "1. BuildRoute(wave_id, pvz_codes)", "gRPC/HTTP2, 50051")
+Rel(grpc_server, route_planner, "2. plan_wave(depot, pvz_codes)", "Python Call")
+Rel(route_planner, pvz_repository, "3. get_points(pvz_codes)", "Python Call")
+Rel(pvz_repository, database, "4. SELECT координаты ПВЗ", "SQL/TCP, 5432")
+Rel(route_planner, matrix_builder, "5. build_matrix(points)", "Python Call")
+Rel(matrix_builder, distance_cache, "6. get(a, b) для всех пар точек", "Python Call")
+Rel(matrix_builder, geo_client, "7. fetch_matrix(missing_pairs)", "Python Call")
+Rel(geo_client, geo_service, "8. Запрос матрицы расстояний", "HTTPS/REST, 443")
+Rel(matrix_builder, distance_cache, "9. put(a, b, km) для новых пар", "Python Call")
+Rel(grpc_server, api_gateway, "10. RouteReply(order, length_km)", "gRPC/HTTP2")
+@enduml

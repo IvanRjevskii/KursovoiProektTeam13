@@ -1,0 +1,35 @@
+@startuml krivenko-landscape
+' ============================================================
+' Команда 13. Уровень L0 — локальная диаграмма ландшафта: встраивание своих контейнеров в ИТ-контур.
+' Автор: Кривенко И. Р. (DevOps).
+' Правила: только Rel() без направляющих суффиксов, без локальных стилей и цветов. ID — из README.md.
+' ============================================================
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Ландшафт (L0): routing_service, file_storage в ИТ-контуре маркетплейса
+
+Enterprise_Boundary(marketplace, "ИТ-контур маркетплейса") {
+    System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+        Container(routing_service, "Сервис маршрутизации", "Python / asyncio", "Построение маршрутов")
+        ContainerDb(file_storage, "Файловое хранилище", "MinIO (S3)", "Фото и чеки")
+        Container(api_gateway, "Backend API", "Python / FastAPI", "Единая точка входа и интеграции")
+    }
+    System(iam, "Единая аутентификация сотрудников (IAM)", "Учётные записи, роли, единый вход (SSO)")
+    System(monitoring, "Корпоративный мониторинг", "Метрики и журналы сервисов")
+    System(erp, "Учётная система (ERP)", "Бухгалтерия: удержания по претензиям, расходы на топливо")
+}
+
+System_Ext(geo_service, "Картографический сервис", "Геокодирование и матрица расстояний")
+System_Ext(fuel_card_processing, "Процессинг топливных карт", "Внешняя финансовая система: транзакции заправок")
+
+Rel(api_gateway, routing_service, "Построение и пересчёт маршрута", "gRPC/HTTP2")
+Rel(api_gateway, file_storage, "Выдача ссылок на загрузку фото", "HTTPS (S3 API)")
+Rel(routing_service, geo_service, "Матрица расстояний, геокодирование", "HTTPS/REST")
+Rel(file_storage, iam, "Проверяет токены доступа к хранилищу", "HTTPS / OAuth2 (OIDC)")
+Rel(monitoring, routing_service, "Собирает метрики сервиса", "HTTPS (Prometheus)")
+Rel(monitoring, file_storage, "Собирает метрики хранилища", "HTTPS (Prometheus)")
+Rel(api_gateway, erp, "Расходы на топливо по маршрутам", "gRPC")
+Rel(api_gateway, fuel_card_processing, "Транзакции заправок", "HTTPS/REST, OAuth2")
+@enduml
