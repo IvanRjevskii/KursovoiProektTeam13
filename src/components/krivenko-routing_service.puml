@@ -1,0 +1,35 @@
+@startuml krivenko-routing_service
+' ============================================================
+' Команда 13. Уровень L3 — диаграмма компонентов контейнера routing_service.
+' Автор: Кривенко И. Р. (DevOps).
+' Внутри сервиса — прямые вызовы Python (Python Call), наружу — сетевые протоколы.
+' ============================================================
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма компонентов контейнера «Сервис маршрутизации» (routing_service)
+
+Container(api_gateway, "Backend API", "Python / FastAPI", "Компонент route_comp запрашивает построение маршрута")
+ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "Координаты ПВЗ и складов")
+System_Ext(geo_service, "Картографический сервис", "Геокодирование, матрица расстояний")
+
+Container_Boundary(routing_service, "Сервис маршрутизации (Python / asyncio)") {
+    Component(grpc_server, "gRPC-сервер", "grpcio (asyncio)", "Принимает запросы BuildRoute и RebuildRoute")
+    Component(route_planner, "Планировщик маршрута", "Python-модуль", "Выбирает алгоритм и строит порядок объезда ПВЗ")
+    Component(matrix_builder, "Построитель матрицы расстояний", "Python-модуль", "Собирает матрицу расстояний между точками маршрута")
+    Component(distance_cache, "Кэш расстояний", "Python, словарь в памяти с TTL", "Хранит уже рассчитанные расстояния")
+    Component(geo_client, "Клиент картографического сервиса", "httpx (async)", "Запросы геокодирования и матрицы расстояний")
+    Component(pvz_repository, "Репозиторий ПВЗ", "asyncpg", "Пространственные запросы по ПВЗ")
+}
+
+Rel(api_gateway, grpc_server, "Построение и пересчёт маршрута", "gRPC/HTTP2, 50051")
+Rel(grpc_server, route_planner, "Передаёт список ПВЗ волны", "Python Call")
+Rel(route_planner, pvz_repository, "Получает координаты ПВЗ", "Python Call")
+Rel(route_planner, matrix_builder, "Запрашивает матрицу расстояний", "Python Call")
+Rel(matrix_builder, distance_cache, "Ищет рассчитанные расстояния", "Python Call")
+Rel(matrix_builder, geo_client, "Запрашивает недостающие расстояния", "Python Call")
+
+Rel(pvz_repository, database, "Пространственные запросы", "SQL/TCP, 5432")
+Rel(geo_client, geo_service, "Матрица расстояний, геокодирование", "HTTPS/REST, 443")
+@enduml
