@@ -1,0 +1,51 @@
+@startuml krivenko-route_planner
+' Команда 13. Уровень L4 — диаграмма классов компонента route_planner (routing_service).
+' Автор: Кривенко И. Р. Код: src/code/krivenko_route_planner.py
+title Диаграмма классов компонента «Планировщик маршрута» (route_planner)
+
+class Point <<dataclass>> {
+  + code: int
+  + lat: float
+  + lon: float
+  + grid: str
+}
+interface DistanceSource <<interface>> {
+  + km(a: Point, b: Point): float
+}
+class DistanceMatrix {
+  - _values: dict[tuple[int, int], float]
+  + km(a: Point, b: Point): float
+}
+class StraightLineDistance {
+  + km(a: Point, b: Point): float
+}
+interface RouteBuildingStrategy <<interface>> {
+  + build(depot: Point, stops: list[Point], dist: DistanceSource): list[Point]
+}
+class GridOrderStrategy {
+  + build(depot: Point, stops: list[Point], dist: DistanceSource): list[Point]
+}
+class NearestNeighborStrategy {
+  + build(depot: Point, stops: list[Point], dist: DistanceSource): list[Point]
+}
+class TwoOptStrategy {
+  - _start: RouteBuildingStrategy
+  + build(depot: Point, stops: list[Point], dist: DistanceSource): list[Point]
+}
+class RoutePlanner {
+  - _strategy: RouteBuildingStrategy
+  + set_strategy(strategy: RouteBuildingStrategy): None
+  + plan(depot: Point, stops: list[Point], dist: DistanceSource): tuple[list[Point], float]
+}
+
+RoutePlanner *-- "1" RouteBuildingStrategy : стратегия
+RouteBuildingStrategy <|.. GridOrderStrategy
+RouteBuildingStrategy <|.. NearestNeighborStrategy
+RouteBuildingStrategy <|.. TwoOptStrategy
+TwoOptStrategy o-- "1" RouteBuildingStrategy : начальный маршрут
+DistanceSource <|.. DistanceMatrix
+DistanceSource <|.. StraightLineDistance
+RouteBuildingStrategy ..> DistanceSource : расстояния
+RoutePlanner ..> DistanceSource : длина маршрута
+RouteBuildingStrategy ..> Point : использует
+@enduml
