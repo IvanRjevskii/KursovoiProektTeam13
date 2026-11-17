@@ -1,0 +1,36 @@
+@startuml chubchenko-deployment
+' ============================================================
+' Команда 13. Диаграмма развёртывания: развёртывание backend api и центральной бд.
+' Автор: Чубченко Д. В. (back-end).
+' Правила: только Rel() без направляющих суффиксов, без локальных стилей и цветов. ID — из README.md.
+' ============================================================
+!include <C4/C4_Deployment>
+
+LAYOUT_WITH_LEGEND()
+
+title Развёртывание Backend API и центральной БД
+
+Deployment_Node(dc, "ЦОД компании", "Частное облако (VPC)") {
+    Deployment_Node(dmz, "Сервер-шлюз (DMZ)", "Ubuntu 24.04 VM") {
+        Container(nginx, "Reverse Proxy", "Nginx", "TLS-терминация, балансировка, раздача SPA")
+    }
+    Deployment_Node(app1, "Сервер приложений 1", "Ubuntu 24.04, Docker") {
+        Container(api_gateway_1, "Backend API, реплика 1", "Python / FastAPI, Uvicorn, порт 8000")
+    }
+    Deployment_Node(app2, "Сервер приложений 2", "Ubuntu 24.04, Docker") {
+        Container(api_gateway_2, "Backend API, реплика 2", "Python / FastAPI, Uvicorn, порт 8000")
+    }
+    Deployment_Node(db_master, "Сервер БД (мастер)", "Ubuntu 24.04 VM") {
+        ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS")
+    }
+    Deployment_Node(db_replica, "Сервер БД (реплика)", "Ubuntu 24.04 VM") {
+        ContainerDb(database_replica, "Реплика БД", "PostgreSQL 16, hot standby")
+    }
+}
+
+Rel(nginx, api_gateway_1, "Балансировка запросов", "HTTP/JSON, 8000")
+Rel(nginx, api_gateway_2, "Балансировка запросов", "HTTP/JSON, 8000")
+Rel(api_gateway_1, database, "Чтение и запись", "SQL/TCP, TLS, 5432")
+Rel(api_gateway_2, database, "Чтение и запись", "SQL/TCP, TLS, 5432")
+Rel(database, database_replica, "Потоковая репликация", "WAL/TCP, 5432")
+@enduml
