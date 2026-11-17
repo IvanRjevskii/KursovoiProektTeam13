@@ -1,0 +1,45 @@
+@startuml chubchenko-returns_comp
+' Команда 13. Уровень L4 — диаграмма классов компонента returns_comp (Backend API).
+' Автор: Чубченко Д. В. Код: src/code/chubchenko_returns_acceptance.py
+title Диаграмма классов компонента «Приёмка возвратов» (returns_comp)
+
+enum AcceptanceMode {
+  BULK
+  SELF
+}
+class ReturnItem <<dataclass>> {
+  + barcode: str
+  + pvz_code: int
+}
+class AcceptanceResult <<dataclass>> {
+  + mode: AcceptanceMode
+  + accepted: list[str]
+  + missing: list[str]
+  + accepted_at: datetime
+  + is_complete: bool
+}
+interface ReturnsAcceptanceStrategy <<interface>> {
+  + mode: AcceptanceMode
+  + accept(items: list[ReturnItem], scanned: set[str]): AcceptanceResult
+}
+class BulkAcceptanceStrategy {
+  + accept(items: list[ReturnItem], scanned: set[str]): AcceptanceResult
+}
+class SelfAcceptanceStrategy {
+  + accept(items: list[ReturnItem], scanned: set[str]): AcceptanceResult
+}
+class ReturnsAcceptanceService {
+  + BULK_THRESHOLD: int = 250
+  - _strategy: ReturnsAcceptanceStrategy
+  + set_strategy(strategy: ReturnsAcceptanceStrategy): None
+  + choose_strategy(items_count: int): None
+  + accept_returns(items: list[ReturnItem], scanned: set[str]): AcceptanceResult
+}
+
+ReturnsAcceptanceService *-- "1" ReturnsAcceptanceStrategy : стратегия
+ReturnsAcceptanceStrategy <|.. BulkAcceptanceStrategy
+ReturnsAcceptanceStrategy <|.. SelfAcceptanceStrategy
+ReturnsAcceptanceStrategy ..> ReturnItem : использует
+ReturnsAcceptanceStrategy ..> AcceptanceResult : создаёт
+AcceptanceResult --> AcceptanceMode
+@enduml
