@@ -1,0 +1,62 @@
+@startuml chubchenko-api_gateway
+' ============================================================
+' Команда 13. Уровень L3 — диаграмма компонентов контейнера api_gateway (Backend API).
+' Автор: Чубченко Д. В. (back-end).
+' Внутри контейнера — прямые вызовы Python (Python Call), наружу — сетевые протоколы.
+' ID стыковочных компонентов (auth_comp, route_comp, waybill_comp, fleet_comp, fuel_comp, claim_comp) — из README.md.
+' ============================================================
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма компонентов контейнера «Backend API» (api_gateway)
+
+Container(courier_app, "Мобильное приложение курьера", "React Native", "Задания, фотоконтроль, приёмка возвратов")
+Container(dispatch_web, "АРМ супервайзера", "React / TypeScript (SPA)", "Маршруты, перераспределение, претензии")
+Container(fleet_web, "АРМ механика", "React / TypeScript (SPA)", "Маршрутные листы, приёмка автомобиля, ДТП")
+ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "Смены, маршруты, задания, маршрутные листы")
+Container(routing_service, "Сервис маршрутизации", "Python / asyncio", "Построение и пересчёт маршрута")
+ContainerDb(file_storage, "Файловое хранилище", "MinIO (S3)", "Фото фотоконтроля, ДТП, чеки")
+System_Ext(medical_terminal, "Терминал медосмотра", "Результат медосмотра")
+System_Ext(wms, "Складская система (WMS)", "Сетки, приёмка возвратов")
+
+Container_Boundary(api_gateway, "Backend API (Python / FastAPI)") {
+    Component(api_router, "REST-контроллеры", "FastAPI Router", "Принимают HTTP-запросы, валидируют данные (Pydantic) и передают их сервисам")
+    Component(auth_comp, "Авторизация и роли", "FastAPI Depends, JWT", "Проверяет токен и роль пользователя: супервайзер, механик, курьер")
+    Component(route_comp, "Маршруты и задания", "Python-модуль", "Маршруты, волны, задания по ПВЗ, перераспределение отправлений")
+    Component(waybill_comp, "Маршрутные листы", "Python-модуль", "Выпуск маршрутного листа, допуск по медосмотру")
+    Component(fleet_comp, "Автопарк", "Python-модуль", "Автомобили, фотоконтроль, ДТП")
+    Component(fuel_comp, "Топливо и пробег", "Python-модуль", "Пробег, остаток топлива, заправки, сверка с транзакциями")
+    Component(claim_comp, "Претензии и стажировки", "Python-модуль", "Претензии водителям, планы стажировок")
+    Component(returns_comp, "Приёмка возвратов", "Python-модуль", "Выбор способа приёмки возвратов: массовая или самосдача")
+    Component(integration_comp, "Адаптеры интеграций", "httpx, grpcio, boto3", "Вызовы WMS, сервиса маршрутизации и файлового хранилища")
+    Component(repo_comp, "Слой доступа к данным", "SQLAlchemy 2.0", "Репозитории сущностей, транзакции")
+}
+
+Rel(courier_app, api_router, "Запросы заданий, статусы, данные смены", "HTTPS/JSON")
+Rel(dispatch_web, api_router, "Закрепление маршрутов, перераспределение", "HTTPS/JSON")
+Rel(fleet_web, api_router, "Выпуск маршрутных листов, приёмка автомобиля", "HTTPS/JSON")
+Rel(medical_terminal, api_router, "Результат медосмотра", "HTTPS/REST (webhook)")
+
+Rel(api_router, auth_comp, "Проверяет токен и роль", "Python Call")
+Rel(api_router, route_comp, "Передаёт запросы по маршрутам и заданиям", "Python Call")
+Rel(api_router, waybill_comp, "Передаёт запросы по маршрутным листам", "Python Call")
+Rel(api_router, fleet_comp, "Передаёт данные фотоконтроля и ДТП", "Python Call")
+Rel(api_router, fuel_comp, "Передаёт данные о пробеге и заправках", "Python Call")
+Rel(api_router, claim_comp, "Передаёт претензии и стажировки", "Python Call")
+Rel(api_router, returns_comp, "Передаёт данные сдачи возвратов", "Python Call")
+Rel(route_comp, integration_comp, "Запрашивает построение маршрута", "Python Call")
+Rel(fleet_comp, integration_comp, "Запрашивает ссылку на загрузку фото", "Python Call")
+Rel(returns_comp, integration_comp, "Сверяет возвраты со складом", "Python Call")
+Rel(route_comp, repo_comp, "Читает и сохраняет маршруты и задания", "Python Call")
+Rel(waybill_comp, repo_comp, "Сохраняет маршрутные листы", "Python Call")
+Rel(fleet_comp, repo_comp, "Сохраняет осмотры и ДТП", "Python Call")
+Rel(fuel_comp, repo_comp, "Сохраняет пробег и заправки", "Python Call")
+Rel(claim_comp, repo_comp, "Сохраняет претензии", "Python Call")
+Rel(returns_comp, repo_comp, "Сохраняет результат приёмки", "Python Call")
+
+Rel(repo_comp, database, "Чтение и запись", "SQL/TCP, 5432")
+Rel(integration_comp, routing_service, "Построение и пересчёт маршрута", "gRPC/HTTP2")
+Rel(integration_comp, file_storage, "Выдача ссылок на загрузку фото", "HTTPS (S3 API)")
+Rel(integration_comp, wms, "Состав рейса, статус сдачи возвратов", "HTTPS/REST")
+@enduml
