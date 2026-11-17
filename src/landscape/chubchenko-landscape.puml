@@ -1,0 +1,36 @@
+@startuml chubchenko-landscape
+' ============================================================
+' Команда 13. Уровень L0 — локальная диаграмма ландшафта: встраивание своих контейнеров в ИТ-контур.
+' Автор: Чубченко Д. В. (back-end).
+' Правила: только Rel() без направляющих суффиксов, без локальных стилей и цветов. ID — из README.md.
+' ============================================================
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Ландшафт (L0): api_gateway, database в ИТ-контуре маркетплейса
+
+Enterprise_Boundary(marketplace, "ИТ-контур маркетплейса") {
+    System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+        Container(api_gateway, "Backend API", "Python / FastAPI", "Единая точка входа и интеграции")
+        ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "Смены, маршруты, маршрутные листы")
+    }
+    System(iam, "Единая аутентификация сотрудников (IAM)", "Учётные записи, роли, единый вход (SSO)")
+    System(hrm, "Кадровая система (HRM)", "Сотрудники, графики смен 3/3, стажировки")
+    System(erp, "Учётная система (ERP)", "Бухгалтерия: удержания по претензиям, расходы на топливо")
+    System(wms, "Складская система (WMS)", "Сетки, приёмка возвратов")
+    System(pvz_system, "Система ПВЗ", "Приём отправлений и выдача возвратов")
+}
+
+System_Ext(fuel_card_processing, "Процессинг топливных карт", "Внешняя финансовая система: транзакции заправок")
+System_Ext(medical_terminal, "Терминал медосмотра", "Результат предрейсового медосмотра")
+
+Rel(api_gateway, database, "Чтение и запись", "SQL/TCP, 5432")
+Rel(api_gateway, iam, "Проверяет токен доступа и роль", "HTTPS / OAuth2 (introspection)")
+Rel(api_gateway, hrm, "Получает графики смен и стажёров", "gRPC")
+Rel(api_gateway, erp, "Передаёт претензии к удержанию и расходы на топливо", "gRPC")
+Rel(api_gateway, wms, "Состав рейса, статус возвратов", "HTTPS/REST")
+Rel(api_gateway, pvz_system, "Состав рейса и время прибытия", "HTTPS/REST")
+Rel(medical_terminal, api_gateway, "Результат медосмотра", "HTTPS/REST (webhook)")
+Rel(api_gateway, fuel_card_processing, "Транзакции заправок", "HTTPS/REST, OAuth2 (client credentials)")
+@enduml

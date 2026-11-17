@@ -1,0 +1,32 @@
+@startuml chubchenko-dynamic
+' ============================================================
+' Команда 13. Динамическая диаграмма: «Допуск водителя к выезду и выпуск маршрутного листа». Нумерация стрелок — порядок вызовов.
+' Автор: Чубченко Д. В. (back-end).
+' Правила: только Rel() без направляющих суффиксов, без локальных стилей и цветов. ID — из README.md.
+' ============================================================
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Динамическая диаграмма — Допуск водителя к выезду и выпуск маршрутного листа
+
+Container(fleet_web, "АРМ механика", "React / TypeScript (SPA)", "Выпуск маршрутного листа")
+System_Ext(medical_terminal, "Терминал медосмотра", "Результат медосмотра")
+Container_Boundary(api_gateway, "Backend API (Python / FastAPI)") {
+    Component(api_router, "REST-контроллеры", "FastAPI Router", "Приём запросов")
+    Component(auth_comp, "Авторизация и роли", "FastAPI Depends, JWT", "Проверка роли")
+    Component(waybill_comp, "Маршрутные листы", "Python-модуль", "Допуск и выпуск")
+    Component(repo_comp, "Слой доступа к данным", "SQLAlchemy 2.0", "Транзакции")
+}
+ContainerDb(database, "Центральная БД", "PostgreSQL 16", "Допуски и маршрутные листы")
+
+Rel(medical_terminal, api_router, "1. Результат медосмотра: допущен", "HTTPS/REST, POST /webhooks/medical")
+Rel(api_router, waybill_comp, "2. register_medical_result(driver_id, result)", "Python Call")
+Rel(waybill_comp, repo_comp, "3. save_admission(admission)", "Python Call")
+Rel(repo_comp, database, "4. INSERT INTO admissions", "SQL/TCP, 5432")
+Rel(fleet_web, api_router, "5. Выпуск маршрутного листа", "HTTPS/JSON, POST /waybills")
+Rel(api_router, auth_comp, "6. require_role(token, mechanic)", "Python Call")
+Rel(api_router, waybill_comp, "7. issue_waybill(driver_id, vehicle_id)", "Python Call")
+Rel(waybill_comp, repo_comp, "8. get_admission() и save_waybill()", "Python Call")
+Rel(repo_comp, database, "9. SELECT admissions; INSERT INTO waybills", "SQL/TCP, 5432")
+@enduml
