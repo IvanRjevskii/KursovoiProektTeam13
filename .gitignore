@@ -11,3 +11,10 @@ desktop.ini
 # личные отчёты не храним в репозитории — они сдаются в ЭОС
 *.docx
 *.pdf
+
+# сборка и кэши (CI собирает сам)
+node_modules/
+build/
+__pycache__/
+.mypy_cache/
+plantuml.jar

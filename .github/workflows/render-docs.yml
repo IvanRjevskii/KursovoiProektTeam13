@@ -1,0 +1,81 @@
+# CI/CD команды 13: проверка и отрисовка диаграмм C4, тесты кода ЛР3.
+# Ведёт тимлид (Ржевский И. А.) совместно с DevOps (Кривенко И. Р.).
+# Любая ошибка в любом шаге — сборка падает с красным крестом, PR не сливается.
+name: Auto Render C4 Architecture Docs
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Graphviz Engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+
+      - name: Download PlantUML Jar Executable
+        run: |
+          wget -q https://github.com/plantuml/plantuml/releases/download/v1.2023.10/plantuml-1.2023.10.jar -O plantuml.jar
+          java -jar plantuml.jar -version
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check team diagram rules (Rel only, no skinparam, titles, glossary)
+        run: python scripts/check_diagrams.py
+
+      - name: Validate PlantUML syntax
+        run: java -jar plantuml.jar -checkonly -failfast2 "src/**/*.puml"
+
+      - name: Compile Diagrams to PNG
+        run: java -jar plantuml.jar -verbose -png -o "$GITHUB_WORKSPACE/docs/images" "src/**/*.puml"
+
+      - name: Python tests and type check (ЛР3)
+        run: |
+          pip install mypy
+          mypy --strict src/code/chubchenko_return_handover.py src/code/krivenko_route_planner.py
+          PYTHONPATH=src/code python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: TypeScript build and tests (ЛР3)
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+
+      - name: Upload rendered diagrams as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: c4-diagrams-png
+          path: docs/images/*.png
+
+      - name: Commit and Push Rendered Artifacts
+        if: github.event_name == 'push'
+        run: |
+          git config --global user.name 'DevOps Bot'
+          git config --global user.email 'devops@stankin.ru'
+          git add docs/images/*.png
+          git commit -m 'docs: auto-update architecture diagrams [skip ci]' || echo 'No changes to commit'
+          git push || echo "::warning::Защита ветки main не дала боту запушить PNG — возьмите их из артефакта c4-diagrams-png"

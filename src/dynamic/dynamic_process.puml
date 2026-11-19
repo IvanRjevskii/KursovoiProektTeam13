@@ -1,0 +1,60 @@
+@startuml dynamic_process
+' ============================================================
+' Команда 13. Сводная динамическая диаграмма.
+' Файл собирает тимлид (Ржевский И. А.) из функций, переданных участниками:
+' Кобоснидзе — dsp_*, Чубченко — api_*, *_comp, Кривенко — grpc_server, route_planner,
+' pvz_repository, Иванов — mob_*.
+' Сквозной процесс: от назначения маршрута накануне до приёмки МК утром.
+' ============================================================
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Динамическая диаграмма — назначение маршрута и выпуск водителя на линию
+
+Container_Boundary(dispatch_web, "АРМ супервайзера") {
+    Component(dsp_route_planner, "Планировщик назначений", "TypeScript", "Выбирает правило назначения")
+    Component(dsp_api_client, "API-клиент", "RTK Query", "Запросы к Backend API")
+}
+Container_Boundary(api_gateway, "Backend API") {
+    Component(api_staff_router, "Роутер АРМ", "FastAPI", "/dispatch/*")
+    Component(api_webhook_router, "Приём вебхуков", "FastAPI", "/hooks/*")
+    Component(api_courier_router, "Роутер приложения курьера", "FastAPI", "/courier/*")
+    Component(route_comp, "Маршруты и задания", "Python", "Маршруты, волны, задания")
+    Component(waybill_comp, "Путевые листы", "Python", "Допуск к выезду")
+    Component(api_routing_client, "Клиент маршрутизации", "grpcio", "BuildRoute")
+    Component(api_repository, "Репозиторий данных", "SQLAlchemy", "Транзакции")
+    Component(api_wms_adapter, "Адаптер WMS", "httpx", "Состав рейса")
+}
+Container_Boundary(routing_service, "Сервис маршрутизации") {
+    Component(grpc_server, "gRPC-сервер", "grpcio", "BuildRoute, RebuildRoute")
+    Component(route_planner, "Планировщик маршрута", "Python", "Порядок объезда ПВЗ")
+    Component(pvz_repository, "Репозиторий ПВЗ", "asyncpg", "Координаты ПВЗ")
+}
+Container_Boundary(courier_app, "Мобильное приложение курьера") {
+    Component(mob_acceptance, "Приёмка МК", "TypeScript", "Стратегия приёмки")
+    Component(mob_api_client, "API-клиент", "fetch", "Запросы к Backend API")
+}
+ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "Маршруты, задания, путевые листы")
+System_Ext(medical_terminal, "Терминал медосмотра", "Результат медосмотра")
+System_Ext(wms, "Складская система (WMS)", "МК рейса")
+
+Rel(dsp_route_planner, dsp_api_client, "1. assign(driver) → Assignment", "TypeScript Call")
+Rel(dsp_api_client, api_staff_router, "2. POST /dispatch/assignments", "HTTPS/JSON, 443")
+Rel(api_staff_router, route_comp, "3. assign_route(driver_id, route_id, date)", "Python Call")
+Rel(route_comp, api_routing_client, "4. build_route(depot, stops)", "Python Call")
+Rel(api_routing_client, grpc_server, "5. BuildRoute", "gRPC/HTTP2, 50051")
+Rel(grpc_server, route_planner, "6. plan(depot, stops, dist)", "Python Call")
+Rel(route_planner, pvz_repository, "7. points(pvz_codes)", "Python Call")
+Rel(pvz_repository, database, "8. SELECT координаты ПВЗ (PostGIS)", "SQL/TCP, 5432")
+Rel(route_comp, api_repository, "9. save_route(route, tasks)", "Python Call")
+Rel(api_repository, database, "10. INSERT маршрут и задания волн", "SQL/TCP, 5432")
+Rel(medical_terminal, api_webhook_router, "11. Результат медосмотра: допущен", "HTTPS/REST (webhook)")
+Rel(api_webhook_router, waybill_comp, "12. mark_medical(driver_id, admitted)", "Python Call")
+Rel(mob_api_client, api_courier_router, "13. GET /courier/shift/today — задания волны 1", "HTTPS/JSON, 443")
+Rel(api_courier_router, route_comp, "14. wave_tasks(shift_id, wave=1)", "Python Call")
+Rel(route_comp, api_wms_adapter, "15. trip_grids(shift_id)", "Python Call")
+Rel(api_wms_adapter, wms, "16. GET состав рейса по МК", "HTTPS/REST, 443")
+Rel(mob_acceptance, mob_api_client, "17. acceptGrid(grid, input) → AcceptanceResult", "TypeScript Call")
+Rel(mob_api_client, api_courier_router, "18. POST /courier/grids/{code}/acceptance", "HTTPS/JSON, 443")
+@enduml
