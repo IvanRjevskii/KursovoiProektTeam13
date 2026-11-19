@@ -1,0 +1,52 @@
+@startuml kobosnidze-dispatch_web
+' ============================================================
+' Команда 13. Уровень L3 — диаграмма компонентов контейнера dispatch_web.
+' Автор: Кобоснидзе С. Г. (аналитик).
+' Внутри SPA — вызовы TypeScript (TypeScript Call), наружу — сетевые протоколы.
+' Backend API — чёрный ящик: стыковочные компоненты auth_comp, route_comp, claim_comp.
+' АРМ механика (fleet_web) на компоненты не раскладывается — по распределению команды.
+' ============================================================
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма компонентов контейнера «АРМ супервайзера» (dispatch_web)
+
+Person(supervisor, "Супервайзер", "Назначает маршруты, ведёт стажировки и претензии")
+Person(admin, "Администратор системы", "Ведёт справочники ПВЗ, автомобилей и учётные записи")
+Container(api_gateway, "Backend API", "Python / FastAPI", "Стыковочные компоненты: auth_comp, route_comp, claim_comp, fleet_comp")
+
+Container_Boundary(dispatch_web, "АРМ супервайзера (React / TypeScript, SPA)") {
+    ' --- Слой представления: страницы ---
+    Component(dsp_routes_page, "Страница планирования", "React, страница", "Маршруты на завтра, перераспределение после ДТП")
+    Component(dsp_claims_page, "Страница претензий", "React, страница", "Список и карточка претензии")
+    Component(dsp_training_page, "Страница стажировок", "React, страница", "Стажёры, наставники, этапы")
+    Component(dsp_directory_page, "Страница справочников", "React, страница", "ПВЗ, автомобили, учётные записи сотрудников")
+
+    ' --- Слой приложения ---
+    Component(dsp_route_planner, "Планировщик назначений", "TypeScript, паттерн «Стратегия»", "Закреплённый, свободный или урезанный маршрут")
+    Component(dsp_claims_service, "Сервис претензий", "TypeScript", "Выставление и обжалование претензий")
+    Component(dsp_training_service, "Сервис стажировок", "TypeScript", "Напарник два дня, затем урезанные маршруты")
+
+    ' --- Инфраструктурный слой ---
+    Component(dsp_state_store, "Хранилище состояния", "Redux Toolkit", "Кэш маршрутов, водителей, претензий")
+    Component(dsp_api_client, "API-клиент", "RTK Query, fetch, JWT", "Запросы к Backend API")
+}
+
+Rel(supervisor, dsp_routes_page, "Назначает маршруты на завтра", "HTTPS (браузер)")
+Rel(supervisor, dsp_claims_page, "Выставляет претензию", "HTTPS (браузер)")
+Rel(supervisor, dsp_training_page, "Ведёт стажёров", "HTTPS (браузер)")
+Rel(admin, dsp_directory_page, "Ведёт справочники и учётные записи", "HTTPS (браузер)")
+
+Rel(dsp_routes_page, dsp_route_planner, "Назначить маршрут водителю", "TypeScript Call")
+Rel(dsp_training_page, dsp_training_service, "Перевести на следующий этап", "TypeScript Call")
+Rel(dsp_claims_page, dsp_claims_service, "Создать претензию", "TypeScript Call")
+Rel(dsp_route_planner, dsp_training_service, "Этап стажировки и наставник", "TypeScript Call")
+Rel(dsp_route_planner, dsp_state_store, "Пул маршрутов и назначения", "TypeScript Call")
+Rel(dsp_claims_service, dsp_state_store, "Список претензий", "TypeScript Call")
+Rel(dsp_training_service, dsp_state_store, "Карточки стажёров", "TypeScript Call")
+Rel(dsp_directory_page, dsp_state_store, "Справочники ПВЗ и автомобилей", "TypeScript Call")
+Rel(dsp_state_store, dsp_api_client, "Загрузить и сохранить данные", "TypeScript Call")
+
+Rel(dsp_api_client, api_gateway, "Маршруты, назначения, претензии, стажировки, справочники", "HTTPS/JSON, 443")
+@enduml
