@@ -1,0 +1,68 @@
+@startuml kobosnidze-dsp_route_planner
+' Команда 13. Уровень L4 — диаграмма классов компонента dsp_route_planner (dispatch_web).
+' Автор: Кобоснидзе С. Г. Код: src/code/kobosnidze_route_assignment.ts
+title Диаграмма классов компонента «Планировщик назначений» (dsp_route_planner)
+
+class Driver <<interface>> {
+  + id: number
+  + name: string
+  + status: DriverStatus
+  + fixedRouteId?: number
+  + traineeDay?: number
+  + mentorId?: number
+}
+class RouteDraft <<interface>> {
+  + id: number
+  + wave: 1 | 2
+  + pvzCodes: number[]
+  + grids: number
+}
+class Assignment <<interface>> {
+  + driverId: number
+  + routeId: number
+  + kind: AssignmentKind
+  + mentorId?: number
+}
+class PlanningBoard <<interface>> {
+  + pool: RouteDraft[]
+  + assigned: Assignment[]
+}
+interface RouteAssignmentStrategy {
+  + kind: string
+  + assign(driver: Driver, board: PlanningBoard): Assignment
+}
+class FixedRouteAssignment {
+  + assign(driver: Driver, board: PlanningBoard): Assignment
+}
+class FreeRouteAssignment {
+  + assign(driver: Driver, board: PlanningBoard): Assignment
+}
+class TraineeRouteAssignment {
+  - pairDays: number = 2
+  - maxPvz: number = 6
+  + assign(driver: Driver, board: PlanningBoard): Assignment
+}
+class StrategyResolver {
+  + resolve(driver: Driver): RouteAssignmentStrategy
+}
+class RouteAssignmentService {
+  - board: PlanningBoard
+  - resolver: StrategyResolver
+  - strategy?: RouteAssignmentStrategy
+  + setStrategy(strategy?: RouteAssignmentStrategy): void
+  + assign(driver: Driver): Assignment
+  + assignments: Assignment[]
+}
+
+RouteAssignmentStrategy <|.. FixedRouteAssignment
+RouteAssignmentStrategy <|.. FreeRouteAssignment
+RouteAssignmentStrategy <|.. TraineeRouteAssignment
+RouteAssignmentService o-- "0..1" RouteAssignmentStrategy : стратегия
+RouteAssignmentService *-- "1" StrategyResolver : выбор по карточке
+RouteAssignmentService *-- "1" PlanningBoard : пул и назначения
+StrategyResolver ..> RouteAssignmentStrategy : создаёт
+PlanningBoard o-- "0..*" RouteDraft
+PlanningBoard o-- "0..*" Assignment
+RouteAssignmentStrategy ..> Driver : читает
+RouteAssignmentStrategy ..> Assignment : возвращает
+@enduml
