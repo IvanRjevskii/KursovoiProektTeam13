@@ -1,0 +1,26 @@
+@startuml ivanov-dynamic
+' Команда 13. Локальная динамическая диаграмма. Автор: Иванов А. А.
+' Сценарий: приёмка МК у ворот склада без связи и досылка при появлении сети.
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Динамическая диаграмма — приёмка МК у ворот склада (мобильное приложение)
+
+Person(courier, "Водитель-курьер", "Принимает МК рейса")
+Container_Boundary(courier_app, "Мобильное приложение курьера") {
+    Component(mob_wave_screens, "Экраны волн и заданий", "React Native", "Список МК рейса")
+    Component(mob_acceptance, "Приёмка МК", "TypeScript, «Стратегия»", "GridAcceptanceService")
+    Component(mob_scanner, "Сканер штрихкодов", "vision-camera", "Считывает штрихкоды грузомест")
+    Component(mob_offline_queue, "Офлайн-очередь", "SQLite", "Хранит результат без связи")
+    Component(mob_api_client, "API-клиент", "fetch, JWT", "Досылает операции")
+}
+Container(api_gateway, "Backend API", "Python / FastAPI", "Стыковочный компонент route_comp")
+
+Rel(courier, mob_wave_screens, "1. Открывает МК 14-02", "Сенсорный экран")
+Rel(mob_wave_screens, mob_acceptance, "2. acceptGrid(grid, input)", "TypeScript Call")
+Rel(mob_acceptance, mob_scanner, "3. scan() — штрихкоды ТЯ, отправлений вне тары, КГТ", "TypeScript Call")
+Rel(mob_acceptance, mob_offline_queue, "4. enqueue(AcceptanceResult)", "TypeScript Call")
+Rel(mob_offline_queue, mob_api_client, "5. flush(batch) при появлении сети", "TypeScript Call")
+Rel(mob_api_client, api_gateway, "6. POST /courier/grids/{code}/acceptance", "HTTPS/JSON, 443")
+@enduml
