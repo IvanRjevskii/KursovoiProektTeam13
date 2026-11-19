@@ -1,0 +1,54 @@
+@startuml ivanov-courier_app
+' ============================================================
+' Команда 13. Уровень L3 — диаграмма компонентов контейнера courier_app.
+' Автор: Иванов А. А. (front-end).
+' Внутри приложения — вызовы TypeScript (TypeScript Call), наружу — сетевые протоколы.
+' Backend API для приложения — чёрный ящик: обращаемся к стыковочным
+' компонентам auth_comp, route_comp, fleet_comp, fuel_comp, return_comp.
+' ============================================================
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма компонентов контейнера «Мобильное приложение курьера» (courier_app)
+
+Person(courier, "Водитель-курьер", "Принимает авто, грузит отправления из МК, выполняет задания в две волны")
+Person(trainee, "Стажёр", "Выполняет урезанный маршрут в режиме стажёра")
+Container(api_gateway, "Backend API", "Python / FastAPI", "Стыковочные компоненты: auth_comp, route_comp, fleet_comp, fuel_comp, return_comp")
+ContainerDb(file_storage, "Файловое хранилище", "MinIO (S3)", "Фото фотоконтроля и чеков")
+
+Container_Boundary(courier_app, "Мобильное приложение курьера (React Native / TypeScript)") {
+    ' --- Слой представления: экраны ---
+    Component(mob_shift_screens, "Экраны смены", "React Native, экраны", "Начало и закрытие смены, пробег и остаток топлива")
+    Component(mob_photo_screens, "Экраны фотоконтроля", "React Native, экраны камеры", "Углы кузова, приборная панель, запасное колесо, акт")
+    Component(mob_wave_screens, "Экраны волн и заданий", "React Native, экраны", "МК рейса, маршрутные точки, код подтверждения ПВЗ")
+
+    ' --- Слой приложения: сценарии ---
+    Component(mob_acceptance, "Приёмка МК и возвратов", "TypeScript, паттерн «Стратегия»", "Скан, ручная отметка или приёмка без проверки")
+    Component(mob_task_manager, "Менеджер заданий", "TypeScript, конечный автомат", "В ожидании → в пути → прибыл → передано / забрано")
+    Component(mob_photo_uploader, "Загрузчик фото", "TypeScript", "Сжимает снимки и отправляет по одноразовой ссылке")
+
+    ' --- Инфраструктурный слой ---
+    Component(mob_scanner, "Сканер штрихкодов", "react-native-vision-camera", "Считывает штрихкоды грузомест и QR МК")
+    Component(mob_offline_queue, "Офлайн-очередь", "SQLite (react-native-quick-sqlite)", "Хранит операции, пока нет связи")
+    Component(mob_api_client, "API-клиент", "fetch, JWT", "Запросы к Backend API, повтор при обрыве связи")
+}
+
+Rel(courier, mob_shift_screens, "Открывает и закрывает смену", "Сенсорный экран")
+Rel(courier, mob_photo_screens, "Снимает автомобиль", "Камера телефона")
+Rel(courier, mob_wave_screens, "Принимает МК, отмечает задания", "Сенсорный экран")
+Rel(trainee, mob_wave_screens, "Отмечает задания урезанного маршрута", "Сенсорный экран")
+
+Rel(mob_wave_screens, mob_acceptance, "Принять МК", "TypeScript Call")
+Rel(mob_wave_screens, mob_task_manager, "Сменить статус задания", "TypeScript Call")
+Rel(mob_acceptance, mob_scanner, "Считать штрихкоды", "TypeScript Call")
+Rel(mob_acceptance, mob_offline_queue, "Сохранить результат приёмки", "TypeScript Call")
+Rel(mob_task_manager, mob_offline_queue, "Сохранить статус задания", "TypeScript Call")
+Rel(mob_photo_screens, mob_photo_uploader, "Передать снимки", "TypeScript Call")
+Rel(mob_shift_screens, mob_api_client, "Открыть или закрыть смену", "TypeScript Call")
+Rel(mob_photo_uploader, mob_api_client, "Запросить ссылку на загрузку", "TypeScript Call")
+Rel(mob_offline_queue, mob_api_client, "Отправить накопленные операции", "TypeScript Call")
+
+Rel(mob_api_client, api_gateway, "Смена, сканы МК, статусы заданий, возвраты", "HTTPS/JSON, 443")
+Rel(mob_photo_uploader, file_storage, "Загружает фото по одноразовой ссылке", "HTTPS (S3 API), 443")
+@enduml

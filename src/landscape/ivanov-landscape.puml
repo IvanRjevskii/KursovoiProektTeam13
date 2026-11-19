@@ -1,0 +1,31 @@
+@startuml ivanov-landscape
+' Команда 13. Локальная диаграмма ландшафта (L0). Автор: Иванов А. А.
+' Как мобильное приложение курьера встраивается в ИТ-контур маркетплейса.
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Локальный ландшафт (L0): мобильное приложение курьера
+
+Person(courier, "Водитель-курьер", "Работает со смартфона")
+Enterprise_Boundary(marketplace, "ИТ-контур маркетплейса") {
+    System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+        Container(courier_app, "Мобильное приложение курьера", "React Native", "Смена, фотоконтроль, МК, задания")
+        Container(api_gateway, "Backend API", "Python / FastAPI", "Единая точка входа")
+    }
+    System(iam, "Единая аутентификация (IAM)", "Вход сотрудника, OAuth2 / OIDC")
+    System(hrm, "Кадровая система (HRM)", "Смены 3/3, статус стажёра")
+    System(wms, "Складская система (WMS)", "МК рейса")
+}
+System_Ext(fuel_card_processing, "Процессинг топливных карт", "Внешняя финансовая система: чек заправки сверяется с транзакцией")
+System_Ext(push_service, "Сервис push-уведомлений", "Firebase Cloud Messaging / RuStore Push")
+
+Rel(courier, courier_app, "Принимает МК, отмечает задания", "Сенсорный экран")
+Rel(courier_app, iam, "Вход по корпоративной учётной записи", "HTTPS / OAuth2 PKCE")
+Rel(courier_app, api_gateway, "Смена, сканы, статусы, возвраты", "HTTPS/JSON, 443")
+Rel(api_gateway, hrm, "Смена и статус стажёра", "gRPC/HTTP2")
+Rel(api_gateway, wms, "Состав рейса по МК", "HTTPS/REST")
+Rel(api_gateway, fuel_card_processing, "Транзакция заправки для сверки с чеком", "HTTPS/REST, mTLS")
+Rel(api_gateway, push_service, "Изменение маршрута, перераспределение", "HTTPS/REST")
+Rel(push_service, courier_app, "Push-уведомление водителю", "HTTPS (FCM / RuStore)")
+@enduml

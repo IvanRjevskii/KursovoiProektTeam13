@@ -1,0 +1,30 @@
+@startuml ivanov-deployment
+' Команда 13. Локальный сегмент диаграммы развёртывания. Автор: Иванов А. А.
+!include <C4/C4_Deployment>
+
+LAYOUT_WITH_LEGEND()
+
+title Развёртывание мобильного приложения курьера
+
+Deployment_Node(phone, "Смартфон водителя", "Android 10+ / iOS 15+") {
+    Deployment_Node(rn, "Среда выполнения", "React Native 0.76, Hermes") {
+        Container(courier_app, "Мобильное приложение курьера", "React Native, TypeScript", "Экраны смены, фотоконтроля, волн")
+    }
+    ContainerDb(local_db, "Локальная офлайн-очередь", "SQLite", "Операции без связи, до 7 дней")
+}
+Deployment_Node(dmz, "Пограничный сервер (DMZ)", "Ubuntu 24.04 LTS") {
+    Container(nginx, "Reverse Proxy", "Nginx 1.26", "TLS 1.3, порт 443")
+}
+Deployment_Node(app, "Сервер приложений", "Docker Engine") {
+    Container(api_gateway, "Backend API", "FastAPI", "Порт 8000")
+}
+Deployment_Node(storage, "Сервер хранилища", "Ubuntu 24.04 LTS") {
+    ContainerDb(file_storage, "Файловое хранилище", "MinIO", "Порт 9000")
+}
+
+Rel(courier_app, local_db, "Запись и чтение очереди", "SQLite API (локально)")
+Rel(courier_app, nginx, "Запросы к API", "HTTPS/JSON, TLS 1.3, 443, мобильная сеть")
+Rel(courier_app, nginx, "Загрузка фото по presigned URL", "HTTPS (S3 API), 443")
+Rel(nginx, api_gateway, "Проксирование /api", "HTTP/JSON, 8000")
+Rel(nginx, file_storage, "Проксирование /s3", "HTTP (S3 API), 9000")
+@enduml
