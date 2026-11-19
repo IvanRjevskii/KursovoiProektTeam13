@@ -1,0 +1,25 @@
+@startuml kobosnidze-deployment
+' Команда 13. Локальный сегмент диаграммы развёртывания. Автор: Кобоснидзе С. Г.
+!include <C4/C4_Deployment>
+
+LAYOUT_WITH_LEGEND()
+
+title Развёртывание АРМ супервайзера и АРМ механика
+
+Deployment_Node(workstation, "Рабочее место супервайзера и механика", "ПК, Windows 10+, браузер на базе Chromium") {
+    Container(dispatch_web, "АРМ супервайзера", "React SPA", "Выполняется в браузере")
+    Container(fleet_web, "АРМ механика", "React SPA", "Выполняется в браузере")
+}
+Deployment_Node(dmz, "Пограничный сервер (DMZ)", "Ubuntu 24.04 LTS") {
+    Container(nginx, "Reverse Proxy и веб-сервер", "Nginx 1.26", "TLS 1.3, 443; статика /dispatch, /fleet с кэшированием")
+}
+Deployment_Node(app, "Сервер приложений", "Docker Engine") {
+    Container(api_gateway, "Backend API", "FastAPI", "Порт 8000")
+}
+System_Ext(iam, "Единая аутентификация (IAM)", "OIDC-провайдер компании")
+
+Rel(dispatch_web, nginx, "Загрузка сборки SPA и запросы /api", "HTTPS, TLS 1.3, 443")
+Rel(fleet_web, nginx, "Загрузка сборки SPA и запросы /api", "HTTPS, TLS 1.3, 443")
+Rel(dispatch_web, iam, "Вход сотрудника (Authorization Code + PKCE)", "HTTPS / OIDC")
+Rel(nginx, api_gateway, "Проксирование /api", "HTTP/JSON, 8000")
+@enduml

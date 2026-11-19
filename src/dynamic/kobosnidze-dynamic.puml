@@ -1,0 +1,26 @@
+@startuml kobosnidze-dynamic
+' Команда 13. Локальная динамическая диаграмма. Автор: Кобоснидзе С. Г.
+' Сценарий: назначение урезанного маршрута стажёру на третий день стажировки.
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+title Динамическая диаграмма — назначение маршрута стажёру (АРМ супервайзера)
+
+Person(supervisor, "Супервайзер", "Планирует маршруты на завтра")
+Container_Boundary(dispatch_web, "АРМ супервайзера") {
+    Component(dsp_routes_page, "Страница планирования", "React", "Маршруты на завтра")
+    Component(dsp_route_planner, "Планировщик назначений", "TypeScript, «Стратегия»", "RouteAssignmentService")
+    Component(dsp_training_service, "Сервис стажировок", "TypeScript", "Этап стажёра")
+    Component(dsp_state_store, "Хранилище состояния", "Redux Toolkit", "Пул и назначения")
+    Component(dsp_api_client, "API-клиент", "RTK Query", "Запросы к Backend API")
+}
+Container(api_gateway, "Backend API", "Python / FastAPI", "Стыковочный компонент route_comp")
+
+Rel(supervisor, dsp_routes_page, "1. Назначает маршрут стажёру", "HTTPS (браузер)")
+Rel(dsp_routes_page, dsp_route_planner, "2. assign(driver)", "TypeScript Call")
+Rel(dsp_route_planner, dsp_training_service, "3. stageOf(driverId) → день 3", "TypeScript Call")
+Rel(dsp_route_planner, dsp_state_store, "4. selectPool(date) → маршрут до 6 ПВЗ", "TypeScript Call")
+Rel(dsp_state_store, dsp_api_client, "5. postAssignment(trainee_short)", "TypeScript Call")
+Rel(dsp_api_client, api_gateway, "6. POST /dispatch/assignments", "HTTPS/JSON, 443")
+@enduml

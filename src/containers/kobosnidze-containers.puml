@@ -1,0 +1,24 @@
+@startuml kobosnidze-containers
+' Команда 13. Локальная диаграмма контейнеров (L2). Автор: Кобоснидзе С. Г.
+' Свои контейнеры: dispatch_web, fleet_web. Остальные — соседи по стыковке.
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Локальные контейнеры (L2): АРМ супервайзера и АРМ механика
+
+Person(supervisor, "Супервайзер", "Маршруты, стажировки, претензии")
+Person(mechanic, "Механик", "Путевые листы, ДТП")
+Person(admin, "Администратор системы", "Справочники")
+System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+    Container(dispatch_web, "АРМ супервайзера", "React / TypeScript (SPA)", "Планирование маршрутов, стажировки, претензии, справочники")
+    Container(fleet_web, "АРМ механика", "React / TypeScript (SPA)", "Путевые листы, выдача и приёмка авто, ДТП")
+    Container(api_gateway, "Backend API", "Python / FastAPI", "Чубченко Д. В.")
+}
+
+Rel(supervisor, dispatch_web, "Закрепляет маршруты, разбирает претензии", "HTTPS (браузер)")
+Rel(admin, dispatch_web, "Ведёт справочники и учётные записи", "HTTPS (браузер)")
+Rel(mechanic, fleet_web, "Выпускает путевые листы, оформляет ДТП", "HTTPS (браузер)")
+Rel(dispatch_web, api_gateway, "Закрепляет маршруты, перераспределяет отправления", "HTTPS/JSON")
+Rel(fleet_web, api_gateway, "Выпускает путевые листы, подтверждает приёмку авто", "HTTPS/JSON")
+@enduml

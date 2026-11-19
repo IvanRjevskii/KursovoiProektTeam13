@@ -1,0 +1,33 @@
+@startuml kobosnidze-landscape
+' Команда 13. Локальная диаграмма ландшафта (L0). Автор: Кобоснидзе С. Г.
+' Как АРМ супервайзера и АРМ механика встраиваются в ИТ-контур маркетплейса.
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Локальный ландшафт (L0): АРМ супервайзера и АРМ механика
+
+Person(supervisor, "Супервайзер", "Планирует маршруты, ведёт стажировки")
+Person(mechanic, "Механик", "Выпускает путевые листы")
+Enterprise_Boundary(marketplace, "ИТ-контур маркетплейса") {
+    System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+        Container(dispatch_web, "АРМ супервайзера", "React / TypeScript", "Маршруты, претензии, стажировки")
+        Container(fleet_web, "АРМ механика", "React / TypeScript", "Путевые листы, ДТП")
+        Container(api_gateway, "Backend API", "Python / FastAPI", "Единая точка входа")
+    }
+    System(iam, "Единая аутентификация (IAM)", "Единый вход, OAuth2 / OIDC")
+    System(hrm, "Кадровая система (HRM)", "Стажёры, наставники, графики 3/3")
+    System(erp, "Учётная система (ERP)", "Удержания по претензиям")
+}
+System_Ext(fuel_card_processing, "Процессинг топливных карт", "Внешняя финансовая система: расход по картам для претензий")
+
+Rel(supervisor, dispatch_web, "Назначает маршруты, выставляет претензии", "HTTPS (браузер)")
+Rel(mechanic, fleet_web, "Выпускает путевые листы", "HTTPS (браузер)")
+Rel(dispatch_web, iam, "Единый вход сотрудника", "HTTPS / OAuth2 (OIDC)")
+Rel(fleet_web, iam, "Единый вход сотрудника", "HTTPS / OAuth2 (OIDC)")
+Rel(dispatch_web, api_gateway, "Маршруты, претензии, стажировки", "HTTPS/JSON, 443")
+Rel(fleet_web, api_gateway, "Путевые листы, приёмка авто", "HTTPS/JSON, 443")
+Rel(api_gateway, hrm, "Стажёры и наставники", "gRPC/HTTP2")
+Rel(api_gateway, erp, "Удержания по претензиям", "gRPC/HTTP2")
+Rel(api_gateway, fuel_card_processing, "Расход по топливным картам", "HTTPS/REST, mTLS")
+@enduml
