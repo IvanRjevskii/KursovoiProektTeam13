@@ -1,0 +1,66 @@
+@startuml ivanov-mob_acceptance
+' Команда 13. Уровень L4 — диаграмма классов компонента mob_acceptance (courier_app).
+' Автор: Иванов А. А. Код: src/code/ivanov_acceptance.ts
+title Диаграмма классов компонента «Приёмка МК» (mob_acceptance)
+
+class ParcelUnit <<interface>> {
+  + barcode: string
+  + kind: UnitKind
+}
+class Grid <<interface>> {
+  + code: string
+  + pvzCode: number
+  + units: ParcelUnit[]
+}
+class AcceptanceInput <<interface>> {
+  + scanned: string[]
+  + manuallyMarked: string[]
+}
+class AcceptanceResult <<interface>> {
+  + gridCode: string
+  + mode: AcceptanceMode
+  + accepted: string[]
+  + missing: string[]
+  + extra: string[]
+  + verified: boolean
+}
+interface AcceptanceStrategy {
+  + mode: AcceptanceMode
+  + accept(grid: Grid, input: AcceptanceInput): AcceptanceResult
+}
+class QrScanAcceptance {
+  + accept(grid: Grid, input: AcceptanceInput): AcceptanceResult
+}
+class ManualMarkAcceptance {
+  - maxManualShare: number = 0.3
+  + accept(grid: Grid, input: AcceptanceInput): AcceptanceResult
+}
+class NoCheckAcceptance {
+  + accept(grid: Grid, input: AcceptanceInput): AcceptanceResult
+}
+interface SyncPort {
+  + enqueue(result: AcceptanceResult): void
+}
+class MemoryQueue {
+  + items: AcceptanceResult[]
+  + enqueue(result: AcceptanceResult): void
+}
+class GridAcceptanceService {
+  - strategy: AcceptanceStrategy
+  - queue: SyncPort
+  + setStrategy(strategy: AcceptanceStrategy): void
+  + acceptGrid(grid: Grid, input: AcceptanceInput): AcceptanceResult
+  + mode: AcceptanceMode
+}
+
+AcceptanceStrategy <|.. QrScanAcceptance
+AcceptanceStrategy <|.. ManualMarkAcceptance
+AcceptanceStrategy <|.. NoCheckAcceptance
+SyncPort <|.. MemoryQueue
+GridAcceptanceService o-- "1" AcceptanceStrategy : стратегия
+GridAcceptanceService --> "1" SyncPort : офлайн-очередь
+Grid *-- "1..*" ParcelUnit
+AcceptanceStrategy ..> Grid : сверяет
+AcceptanceStrategy ..> AcceptanceInput : читает
+AcceptanceStrategy ..> AcceptanceResult : возвращает
+@enduml
