@@ -1,6 +1,6 @@
-@startuml chubchenko-returns_comp
+@startuml chubchenko-return_comp
 ' Команда 13. Уровень L4 — диаграмма классов компонента returns_comp (Backend API).
-' Автор: Чубченко Д. В. Код: src/code/chubchenko_returns_acceptance.py
+' Автор: Чубченко Д. В. Код: src/code/chubchenko_return_handover.py
 title Диаграмма классов компонента «Приёмка возвратов» (returns_comp)
 
 enum AcceptanceMode {
