@@ -1,0 +1,57 @@
+@startuml main-deployment
+' ============================================================
+' Команда 13. Сводная диаграмма развёртывания (уровень контейнеров).
+' Файл собирает тимлид (Ржевский И. А.) с Кривенко И. Р. (DevOps)
+' из локальных сегментов участников.
+' Публичный доступ — только порт 443 пограничного сервера; остальные узлы
+' в закрытых подсетях ЦОД.
+' ============================================================
+!include <C4/C4_Deployment>
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма развёртывания ИС управления транспортной логистикой и автопарком
+
+Deployment_Node(phone, "Смартфон водителя", "Android 10+ / iOS 15+") {
+    Container(courier_app, "Мобильное приложение курьера", "React Native", "Офлайн-очередь в SQLite на устройстве")
+}
+Deployment_Node(workstation, "Рабочее место супервайзера и механика", "ПК, браузер на базе Chromium") {
+    Container(dispatch_web, "АРМ супервайзера", "React SPA", "Загружается с Nginx")
+    Container(fleet_web, "АРМ механика", "React SPA", "Загружается с Nginx")
+}
+Deployment_Node(dc, "ЦОД компании", "Частное облако, три подсети") {
+    Deployment_Node(dmz, "Пограничный сервер (DMZ)", "Ubuntu 24.04 LTS, VM 2 vCPU") {
+        Container(nginx, "Reverse Proxy", "Nginx 1.26", "TLS 1.3, порт 443; раздаёт сборки SPA, проксирует /api и /s3")
+    }
+    Deployment_Node(app, "Сервер приложений", "Ubuntu 24.04 LTS, Docker Engine, VM 8 vCPU") {
+        Container(api_gateway, "Backend API", "Python 3.12, FastAPI, uvicorn × 4", "Порт 8000, две реплики за Nginx")
+        Container(routing_service, "Сервис маршрутизации", "Python 3.12, grpcio", "Порт 50051")
+    }
+    Deployment_Node(db_master, "Сервер БД (мастер)", "Ubuntu 24.04 LTS, SSD NVMe") {
+        ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "Порт 5432, все записи")
+    }
+    Deployment_Node(db_replica, "Сервер БД (реплика)", "Ubuntu 24.04 LTS, SSD NVMe") {
+        ContainerDb(database_replica, "Реплика центральной БД", "PostgreSQL 16 + PostGIS", "Горячий резерв, чтение для маршрутизации")
+    }
+    Deployment_Node(storage, "Сервер хранилища", "Ubuntu 24.04 LTS, 4 × HDD") {
+        ContainerDb(file_storage, "Файловое хранилище", "MinIO", "Порт 9000, бакеты фото и чеков")
+    }
+}
+System_Ext(wms, "Складская система (WMS)", "ИТ-контур маркетплейса")
+System_Ext(fuel_card_processing, "Процессинг топливных карт", "Внешняя финансовая система")
+System_Ext(geo_service, "Картографический сервис", "Внешний API")
+
+Rel(courier_app, nginx, "Запросы к API и загрузка фото", "HTTPS/JSON, TLS 1.3, 443")
+Rel(dispatch_web, nginx, "Запросы АРМ супервайзера", "HTTPS/JSON, TLS 1.3, 443")
+Rel(fleet_web, nginx, "Запросы АРМ механика", "HTTPS/JSON, TLS 1.3, 443")
+Rel(nginx, api_gateway, "Проксирование /api", "HTTP/JSON, 8000")
+Rel(nginx, file_storage, "Проксирование /s3 (presigned URL)", "HTTP (S3 API), 9000")
+Rel(api_gateway, routing_service, "Построение маршрута", "gRPC/HTTP2, 50051")
+Rel(api_gateway, database, "Чтение и запись", "SQL/TCP, 5432, TLS")
+Rel(routing_service, database_replica, "Координаты ПВЗ (только чтение)", "SQL/TCP, 5432, TLS")
+Rel(database, database_replica, "Потоковая репликация", "WAL/TCP, 5432")
+Rel(api_gateway, file_storage, "Ссылки на загрузку, чтение фото", "HTTPS (S3 API), 9000")
+Rel(api_gateway, wms, "Состав рейса, возвраты", "HTTPS/REST, 443")
+Rel(api_gateway, fuel_card_processing, "Транзакции заправок", "HTTPS/REST, mTLS, 443")
+Rel(routing_service, geo_service, "Матрица расстояний", "HTTPS/REST, 443")
+@enduml
