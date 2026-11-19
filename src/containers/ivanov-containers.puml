@@ -1,0 +1,22 @@
+@startuml ivanov-containers
+' Команда 13. Локальная диаграмма контейнеров (L2). Автор: Иванов А. А.
+' Свой контейнер: courier_app. Остальные — соседи по стыковке.
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Локальные контейнеры (L2): мобильное приложение курьера
+
+Person(courier, "Водитель-курьер", "Работает со смартфона")
+Person(trainee, "Стажёр", "Режим стажёра")
+System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+    Container(courier_app, "Мобильное приложение курьера", "React Native", "Фотоконтроль, приёмка МК, задания по волнам, возвраты, офлайн-очередь")
+    Container(api_gateway, "Backend API", "Python / FastAPI", "Чубченко Д. В.")
+    ContainerDb(file_storage, "Файловое хранилище", "MinIO", "Кривенко И. Р.")
+}
+
+Rel(courier, courier_app, "Принимает МК, отмечает задания, сдаёт возвраты", "Мобильный интерфейс (Android/iOS)")
+Rel(trainee, courier_app, "Отмечает задания в режиме стажёра", "Мобильный интерфейс (Android/iOS)")
+Rel(courier_app, api_gateway, "Запрашивает задания волны, отправляет сканы и статусы", "HTTPS/JSON")
+Rel(courier_app, file_storage, "Загружает фото фотоконтроля и чеков по выданной ссылке", "HTTPS (S3 API)")
+@enduml
