@@ -1,0 +1,39 @@
+@startuml krivenko-containers
+' ============================================================
+' Команда 13. Уровень L2 - локальная диаграмма контейнеров с фокусом на своих контейнерах.
+' Автор: Кривенко И. Р. (DevOps).
+' Правила: только Rel() без направляющих суффиксов, без локальных стилей и цветов. ID - из README.md.
+' ============================================================
+!include <C4/C4_Container>
+LAYOUT_WITH_LEGEND()
+title Диаграмма контейнеров (L2) с фокусом на зоне ответственности: Кривенко И. Р.
+Person(courier, "Водитель-курьер", "Выполняет рейсы в две волны")
+Person(mechanic, "Механик", "Выпускает маршрутные листы, принимает автомобили")
+Person(supervisor, "Супервайзер", "Закрепляет маршруты за водителями, перераспределяет задания")
+System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+    Container(courier_app, "Мобильное приложение курьера", "React Native", "Маршрут и задания по ПВЗ, фотоконтроль автомобиля")
+    Container(dispatch_web, "АРМ супервайзера", "React / TypeScript (SPA)", "Закрепление маршрутов, перераспределение заданий")
+    Container(fleet_web, "АРМ механика", "React / TypeScript (SPA)", "Маршрутные листы, приёмка и сдача автомобилей")
+    Container(api_gateway, "Backend API", "Python / FastAPI", "Бизнес-логика: маршруты, путевые листы, автопарк, топливо, претензии")
+    Container(routing_service, "Сервис маршрутизации", "Python / asyncio, gRPC, OR-Tools", "Строит порядок объезда ПВЗ для волны, пересчитывает маршрут")
+    ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "Маршруты, волны, ПВЗ с координатами, автомобили, маршрутные листы")
+    ContainerDb(file_storage, "Файловое хранилище", "MinIO (S3)", "Фото фотоконтроля и ДТП, фото чеков АЗС")
+}
+System_Ext(geo_service, "Картографический сервис", "Геокодирование и матрица расстояний")
+System_Ext(wms, "Складская система (WMS)", "Состав рейса по сеткам")
+System_Ext(fuel_card_processing, "Процессинг топливных карт", "Транзакции заправок по корпоративным картам")
+Rel(courier, courier_app, "Получает маршрут, фотографирует автомобиль и чеки", "HTTPS")
+Rel(supervisor, dispatch_web, "Запрашивает построение и пересчёт маршрутов", "HTTPS")
+Rel(mechanic, fleet_web, "Просматривает фото осмотров и ДТП", "HTTPS")
+Rel(courier_app, api_gateway, "Получает маршрут волны, отправляет статусы заданий", "HTTPS/JSON")
+Rel(dispatch_web, api_gateway, "Создаёт и перераспределяет маршруты", "HTTPS/JSON")
+Rel(fleet_web, api_gateway, "Работает с маршрутными листами и автомобилями", "HTTPS/JSON")
+Rel(courier_app, file_storage, "Загружает фото по временной ссылке", "HTTPS (S3 API)")
+Rel(api_gateway, file_storage, "Выдаёт временные ссылки на загрузку и просмотр фото", "HTTPS (S3 API)")
+Rel(api_gateway, routing_service, "Построение и пересчёт маршрута", "gRPC/HTTP2, 50051")
+Rel(routing_service, database, "Читает координаты ПВЗ, сохраняет порядок объезда", "SQL/TCP, 5432")
+Rel(routing_service, geo_service, "Запрашивает матрицу расстояний", "HTTPS/REST, 443")
+Rel(api_gateway, database, "Читает и записывает данные системы", "SQL/TCP, 5432")
+Rel(api_gateway, wms, "Запрашивает состав рейса по сеткам", "HTTPS/REST")
+Rel(api_gateway, fuel_card_processing, "Запрашивает транзакции заправок", "HTTPS/REST")
+@enduml
