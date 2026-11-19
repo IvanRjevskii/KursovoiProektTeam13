@@ -1,0 +1,36 @@
+@startuml chubchenko-containers
+' Команда 13. Локальная диаграмма контейнеров (L2). Автор: Чубченко Д. В.
+' Свои контейнеры: api_gateway, database. Остальные — соседи по стыковке.
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Локальные контейнеры (L2): Backend API и центральная БД
+
+System_Ext(medical_terminal, "Терминал медосмотра", "Результат медосмотра")
+System_Ext(wms, "Складская система (WMS)", "МК, приёмка возвратов")
+System_Ext(pvz_system, "Система ПВЗ", "Передача отправлений и возвратов")
+System_Ext(fuel_card_processing, "Процессинг топливных карт", "Транзакции заправок")
+
+System_Boundary(fleet_system, "ИС управления транспортной логистикой и автопарком") {
+    Container(courier_app, "Мобильное приложение курьера", "React Native", "Иванов А. А.")
+    Container(dispatch_web, "АРМ супервайзера", "React / TypeScript", "Кобоснидзе С. Г.")
+    Container(fleet_web, "АРМ механика", "React / TypeScript", "Кобоснидзе С. Г.")
+    Container(api_gateway, "Backend API", "Python / FastAPI", "Авторизация, бизнес-логика, интеграции, сдача возвратов")
+    ContainerDb(database, "Центральная БД", "PostgreSQL 16 + PostGIS", "Смены, маршруты, задания, возвраты, претензии")
+    Container(routing_service, "Сервис маршрутизации", "Python / asyncio", "Кривенко И. Р.")
+    ContainerDb(file_storage, "Файловое хранилище", "MinIO", "Кривенко И. Р.")
+}
+
+Rel(courier_app, api_gateway, "Отправляет сканы МК, статусы заданий, возвраты", "HTTPS/JSON")
+Rel(dispatch_web, api_gateway, "Закрепляет маршруты, выставляет претензии", "HTTPS/JSON")
+Rel(fleet_web, api_gateway, "Выпускает путевые листы", "HTTPS/JSON")
+Rel(api_gateway, database, "Читает и записывает смены, задания, возвраты", "SQL/TCP 5432")
+Rel(api_gateway, routing_service, "Запрашивает построение и пересчёт маршрута", "gRPC/HTTP2")
+Rel(api_gateway, file_storage, "Выдаёт ссылки на загрузку фото", "HTTPS (S3 API)")
+Rel(medical_terminal, api_gateway, "Передаёт результат медосмотра", "HTTPS/REST (webhook)")
+Rel(api_gateway, wms, "Запрашивает состав рейса, подтверждает возвраты", "HTTPS/REST")
+Rel(api_gateway, pvz_system, "Передаёт состав рейса", "HTTPS/REST")
+Rel(pvz_system, api_gateway, "Подтверждает выдачу возвратов", "HTTPS/REST (webhook)")
+Rel(api_gateway, fuel_card_processing, "Запрашивает транзакции заправок", "HTTPS/REST")
+@enduml
